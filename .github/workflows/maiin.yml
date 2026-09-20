@@ -1,0 +1,49 @@
+name: Windows RDP
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Mengaktifkan RDP
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+    - name: Buat Password User Administrator
+      run: |
+        $Password = ConvertTo-SecureString "Rahasia123!" -AsPlainText -Force
+        New-LocalUser "RDPUser" -Password $Password -FullName "RDP User" -Description "User RDP"
+        Add-LocalGroupMember -Group "Administrators" -Member "RDPUser"
+
+    - name: Unduh & Install Ngrok
+      run: |
+        choco install ngrok -y
+
+    - name: Hubungkan Ngrok Tunnel
+      run: |
+        ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+        Start-Process ngrok -ArgumentList "tcp 3389"
+
+    - name: Tampilkan Alamat Koneksi RDP
+      run: |
+        Start-Sleep -Seconds 10
+        $tunnel = Invoke-RestMethod -Uri http://127.0.0.1:4040/api/tunnels
+        $public_url = $tunnel.tunnels[0].public_url
+        Write-Host "=========================================="
+        Write-Host "ALAMAT KONEKSI RDP: $public_url"
+        Write-Host "USERNAME        : RDPUser"
+        Write-Host "PASSWORD        : Rahasia123!"
+        Write-Host "=========================================="
+
+    - name: Menjaga RDP Tetap Aktif
+      run: |
+        $i = 0
+        while ($i -lt 360) {
+          Start-Sleep -Seconds 60
+          $i++
+        }
