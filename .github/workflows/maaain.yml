@@ -1,0 +1,43 @@
+name: Windows RDP Tailscale
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Mengaktifkan RDP
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+    - name: Buat Password User Administrator
+      run: |
+        $Password = ConvertTo-SecureString "Rahasia123!" -AsPlainText -Force
+        New-LocalUser "RDPUser" -Password $Password -FullName "RDP User" -Description "User RDP"
+        Add-LocalGroupMember -Group "Administrators" -Member "RDPUser"
+
+    - name: Hubungkan ke Tailscale
+      uses: tailscale/github-action@v2
+      with:
+        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+    - name: Tampilkan Informasi Koneksi RDP
+      run: |
+        $ip = (Get-NetIPAddress -InterfaceAlias "Tailscale*" -AddressFamily IPv4).IPAddress
+        Write-Host "=========================================="
+        Write-Host "IP KONEKSI RDP  : $ip"
+        Write-Host "USERNAME        : RDPUser"
+        Write-Host "PASSWORD        : Rahasia123!"
+        Write-Host "=========================================="
+
+    - name: Menjaga RDP Tetap Aktif
+      run: |
+        $i = 0
+        while ($i -lt 360) {
+          Start-Sleep -Seconds 60
+          $i++
+        }
